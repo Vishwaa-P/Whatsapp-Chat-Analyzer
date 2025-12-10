@@ -2,8 +2,8 @@ import re
 import pandas as pd
 
 def preprocess(data):
-    # 1. UPDATED REGEX: Now supports both "20:15" and "8:15 pm"
-    # The part (?:\s?[aA][mM]|\s?[pP][mM])? matches optional AM/PM
+    # 1. ROBUST REGEX
+    # Matches dates with 2 or 4 digit years, and times with optional AM/PM
     pattern = r'\d{1,2}/\d{1,2}/\d{2,4},\s\d{1,2}:\d{2}(?:\s?[aA][mM]|\s?[pP][mM])?\s-\s'
     
     messages = re.split(pattern, data)[1:]
@@ -11,13 +11,36 @@ def preprocess(data):
 
     df = pd.DataFrame({'user_message': messages, 'message_date': dates})
 
-    # 2. DUAL FORMAT CONVERSION
-    try:
-        # Try 24-hour format first (e.g., 20:15)
-        df['message_date'] = pd.to_datetime(df['message_date'], format='%d/%m/%Y, %H:%M - ')
-    except ValueError:
-        # If that fails, assume 12-hour format (e.g., 8:15 pm)
-        df['message_date'] = pd.to_datetime(df['message_date'], format='%d/%m/%Y, %I:%M %p - ')
+    # 2. DATE PARSING (Try all common formats)
+    def parse_date(date_str):
+        # List of potential formats to check
+        # %Y = 2025, %y = 25
+        # %H = 24hr, %I = 12hr
+        formats = [
+            '%d/%m/%Y, %H:%M - ',        # 24hr, 4-digit year
+            '%d/%m/%y, %H:%M - ',        # 24hr, 2-digit year
+            '%d/%m/%Y, %I:%M %p - ',     # 12hr, 4-digit year
+            '%d/%m/%y, %I:%M %p - ',     # 12hr, 2-digit year (Your Case)
+            '%m/%d/%y, %H:%M - ',        # US format fallback
+            '%m/%d/%Y, %H:%M - '
+        ]
+        
+        # Sometimes there is a hidden "narrow no-break space" before PM/AM
+        # We replace it with a normal space just in case
+        date_str = date_str.replace('\u202f', ' ')
+
+        for fmt in formats:
+            try:
+                return pd.to_datetime(date_str, format=fmt)
+            except ValueError:
+                continue
+        return pd.NaT # Return "Not a Time" if all fail
+
+    # Apply the parser to the whole column
+    df['message_date'] = df['message_date'].apply(parse_date)
+    
+    # Drop rows where date parsing failed completely
+    df.dropna(subset=['message_date'], inplace=True)
 
     df.rename(columns={'message_date': 'date'}, inplace=True)
 
@@ -36,8 +59,6 @@ def preprocess(data):
     df['message'] = messages
     df.drop(columns=['user_message'], inplace=True)
 
-    # NOTE: We intentionally keep '<Media omitted>' messages so helper can count them as media
-    # Reset index (so row numbers start at 0)
     df.reset_index(drop=True, inplace=True)
 
     df['only_date'] = df['date'].dt.date
