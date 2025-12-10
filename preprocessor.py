@@ -1,15 +1,24 @@
 import re
 import pandas as pd
 
-
 def preprocess(data):
-    pattern = r'\d{1,2}/\d{1,2}/\d{2,4},\s\d{1,2}:\d{2}\s-\s'
+    # 1. UPDATED REGEX: Now supports both "20:15" and "8:15 pm"
+    # The part (?:\s?[aA][mM]|\s?[pP][mM])? matches optional AM/PM
+    pattern = r'\d{1,2}/\d{1,2}/\d{2,4},\s\d{1,2}:\d{2}(?:\s?[aA][mM]|\s?[pP][mM])?\s-\s'
+    
     messages = re.split(pattern, data)[1:]
     dates = re.findall(pattern, data)
 
     df = pd.DataFrame({'user_message': messages, 'message_date': dates})
-    # convert message_date type
-    df['message_date'] = pd.to_datetime(df['message_date'], format='%d/%m/%Y, %H:%M - ')
+
+    # 2. DUAL FORMAT CONVERSION
+    try:
+        # Try 24-hour format first (e.g., 20:15)
+        df['message_date'] = pd.to_datetime(df['message_date'], format='%d/%m/%Y, %H:%M - ')
+    except ValueError:
+        # If that fails, assume 12-hour format (e.g., 8:15 pm)
+        df['message_date'] = pd.to_datetime(df['message_date'], format='%d/%m/%Y, %I:%M %p - ')
+
     df.rename(columns={'message_date': 'date'}, inplace=True)
 
     users = []
