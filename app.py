@@ -28,10 +28,17 @@ st.markdown(
 )
 
 # --- Sidebar: upload only ---
-st.sidebar.header("🔧 Upload Chat File")
-st.sidebar.write("Upload a WhatsApp export (.txt). Your file stays local — nothing is uploaded anywhere.")
+st.sidebar.title("Whatsapp Chat Analyzer")
 
-uploaded_file = st.sidebar.file_uploader("Choose a WhatsApp export (.txt)", type=["txt"])
+
+st.sidebar.markdown("### 💡 How to export chat?")
+st.sidebar.text("1. Open WhatsApp chat")
+st.sidebar.text("2. Click ⋮ > More > Export chat")
+st.sidebar.text("3. Choose 'Without Media'")
+st.sidebar.text("4. Upload .txt file below")
+# ----------------------------
+
+uploaded_file = st.sidebar.file_uploader("Choose a file")
 
 # Helper: convert dataframe to CSV bytes for downloads
 @st.cache_data
